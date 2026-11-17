@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modelo 3D completo das fases AFm</title>
+<style>
+:root{--bg:#f6f8fb;--fg:#18212b;--mut:#5b6b7a;--card:#ffffff;--bd:#d9e1ea;--ac:#185c9b;--ca:#4caf6a;--al:#b35fa8;--o:#e5534b;--w:#4a9de0;--s:#e8c53a;--cl:#9acd32}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:1500px;margin:0 auto;padding:18px} h1{margin:0 0 4px;font-size:24px} .sub{margin:0 0 16px;color:var(--mut)}
+.grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px} @media (max-width:980px){.grid{grid-template-columns:1fr}}
+#cv{height:min(76vh,760px);min-height:460px;background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;touch-action:none;cursor:grab}
+#cv canvas{width:100%;height:100%;display:block}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px} .row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0} .leg{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;color:var(--mut);font-size:13px}
+.leg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+button,label{font:inherit} button{border:1px solid var(--bd);background:#fff;padding:8px 11px;border-radius:10px;cursor:pointer} button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+label.chk{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:13px;background:#fff;border:1px solid var(--bd);padding:7px 10px;border-radius:10px}
+#tip{position:fixed;display:none;pointer-events:none;background:#fff;border:1px solid var(--bd);padding:4px 8px;border-radius:8px;font-size:12px;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+small.note{color:var(--mut);display:block;margin-top:10px}
+.table{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:14px}
+.table b{white-space:nowrap} .phaseTitle{font-size:17px;margin:0 0 6px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Modelo 3D completo das fases AFm</h1>
+  <p class="sub">Modelo didático baseado na Fig. 6.1 e na seção 6.1.1 de Taylor, <em>Cement Chemistry</em>. Arraste para girar; role para dar zoom.</p>
+  <div class="grid">
+    <div>
+      <div id="cv"></div>
+      <div class="leg">
+        <span><i style="background:var(--ca)"></i>Ca</span>
+        <span><i style="background:var(--al)"></i>Al/Fe</span>
+        <span><i style="background:var(--o)"></i>O de OH</span>
+        <span><i style="background:var(--w)"></i>O da H₂O</span>
+        <span><i style="background:var(--s)"></i>S / SO₄²⁻</span>
+        <span><i style="background:var(--cl)"></i>Cl⁻</span>
+        <span><i style="background:#eef3f7;border:1px solid #9aa6b2"></i>H</span>
+      </div>
+      <div class="row" id="phaseBtns"></div>
+      <div class="row" id="viewBtns"></div>
+      <div class="row" id="toggles"></div>
+      <div class="row">
+        <button id="bAuto">Pausar rotação</button>
+        <button id="bReset">Reiniciar vista</button>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2 class="phaseTitle" id="phaseTitle"></h2>
+        <div id="phaseText"></div>
+        <div class="table" style="margin-top:10px">
+          <b>Camada principal</b><span>[Ca₂Al(OH)₆]⁺</span>
+          <b>Alturas relativas</b><span>Al = 0 pm; Ca = ±57 pm; O de OH = ±98 pm</span>
+          <b>Elemento estrutural a</b><span>0,57–0,59 nm (aqui: 0,58 nm)</span>
+          <b>Coordenação do Ca</b><span>6 OH + 1 H₂O interlamelar = 7</span>
+        </div>
+        <small class="note">O modelo mostra <b>duas camadas principais</b>, a <b>água coordenada</b> ao Ca e a <b>intercamada</b> com ânions X e H₂O. O empilhamento e parte das geometrias de H e H₂O são didáticos. Para uso cristalográfico rigoroso, ainda seria necessário um arquivo CIF experimental.</small>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="tip"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const T=THREE;
+const host=document.getElementById('cv');
+const renderer=new T.WebGLRenderer({antialias:true,alpha:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); host.appendChild(renderer.domElement);
+const scene=new T.Scene();
+const camera=new T.PerspectiveCamera(38,1,0.1,500);
+scene.add(new T.AmbientLight(0xffffff,.62)); const d1=new T.DirectionalLight(0xffffff,.95); d1.position.set(20,25,18); scene.add(d1); const d2=new T.DirectionalLight(0xffffff,.35); d2.position.set(-15,-10,6); scene.add(d2);
+const spin=new T.Group(), root=new T.Group(); spin.add(root); scene.add(spin); spin.rotation.x=.48;
+const V=(x,y,z)=>new T.Vector3(x,z,-y); // keep z as vertical in scene
+const cfg={a:5.8,c:7.9,ca:0.57,oh:0.98,w:2.35,n:4};
+const colors={Ca:0x4caf6a,Al:0xb35fa8,O:0xe5534b,H:0xeef3f7,W:0x4a9de0,S:0xe8c53a,Cl:0x9acd32,bond:0x8994a1};
+const state={phase:'monosulfate',auto:true};
+const phaseInfo={
+  monosulfate:{title:'AFm tipo monossulfato (C₃A·CaSO₄·12H₂O)',text:'<p>Nesta representação completa, a intercamada mostra um padrão simplificado do <b>monossulfato</b>: parte das cavidades contém <b>SO₄²⁻</b> (aqui mostrado como tetraedro) e as demais contêm <b>duas moléculas de H₂O</b>.</p><p>Essa é a fase AFm mais importante para a hidratação do cimento Portland quando o sulfato disponível diminui.</p>'},
+  c4ah13:{title:'AFm tipo C₄AH₁₃',text:'<p>No <b>C₄AH₁₃</b>, as cavidades interlamelares contêm <b>um OH⁻ e uma H₂O</b>. A fase é útil para compreender o papel das intercamadas e da troca aniônica nas AFm.</p>'},
+  friedel:{title:'AFm tipo sal de Friedel (C₃A·CaCl₂·10H₂O)',text:'<p>No <b>sal de Friedel</b>, cada cavidade da intercamada contém um <b>Cl⁻</b>. Essa fase é relevante em sistemas cimentícios expostos a cloretos.</p>'}
+};
+function addSphere(g,pos,r,col,sp,zr){const m=new T.Mesh(new T.SphereGeometry(r,24,16),new T.MeshPhongMaterial({color:col,shininess:70})); m.position.copy(pos); m.userData={sp,zr}; g.add(m); return m;}
+function addCyl(g,p1,p2,r,col,sp){const v=new T.Vector3().subVectors(p2,p1); const h=v.length(); if(h<1e-6)return; const m=new T.Mesh(new T.CylinderGeometry(r,r,h,16),new T.MeshPhongMaterial({color:col,shininess:40})); m.position.copy(new T.Vector3().addVectors(p1,p2).multiplyScalar(.5)); m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), v.clone().normalize()); m.userData={sp}; g.add(m); return m;}
+function unique(points){const m=new Map(); points.forEach(p=>{const k=[p.x.toFixed(3),p.y.toFixed(3),p.z.toFixed(3)].join('|'); m.set(k,p);}); return [...m.values()];}
+function principalLayer(g,z0){
+  const a=cfg.a,N=cfg.n,cx=(N-1)*a*.75,cy=(N-1)*a*Math.sqrt(3)/4; const al=[]; const metals=[]; let ohs=[];
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){
+    const x=i*a+j*a/2-cx, y=j*a*Math.sqrt(3)/2-cy; const k=((i-j)%3+3)%3, isAl=k===0, up=k===1;
+    const z=z0+(isAl?0:(up?cfg.ca:-cfg.ca)); const p=V(x,y,z); const sp=isAl?'Al':'Ca'; addSphere(g,p,isAl?.55:.72,colors[sp],sp,z-z0); metals.push({sp,p,up,isAl,x,y}); if(isAl)al.push([x,y]);
+    ohs.push(V(x+a/2,y+a*Math.sqrt(3)/6,z0+cfg.oh), V(x+a,y+a*Math.sqrt(3)/3,z0-cfg.oh));
+  }
+  ohs=unique(ohs);
+  ohs.forEach(o=>{ addSphere(g,o,.42,colors.O,'OH',o.y-z0); const h=new T.Vector3(o.x,o.y+(o.y>=z0?.8:-.8),o.z); addSphere(g,h,.18,colors.H,'H',h.y-z0); addCyl(g,o,h,.06,0xbec8d2,'bond'); });
+  metals.forEach(m=>{ ohs.forEach(o=>{ if(m.p.distanceTo(o)<4.15) addCyl(g,m.p,o,.085,colors.bond,'bond'); }); if(m.sp==='Ca'){ const wz=z0+(m.up?cfg.ca+cfg.w:-(cfg.ca+cfg.w)); const w=V(m.x,m.y,wz); addSphere(g,w,.45,colors.W,'H2O',w.y-z0); addCyl(g,m.p,w,.09,0x6d7e8e,'bond'); const h1=w.clone().add(new T.Vector3(.72,.35,0)); const h2=w.clone().add(new T.Vector3(-.24,.35,.66)); addSphere(g,h1,.18,colors.H,'H',h1.y-z0); addSphere(g,h2,.18,colors.H,'H',h2.y-z0); addCyl(g,w,h1,.06,0xbec8d2,'bond'); addCyl(g,w,h2,.06,0xbec8d2,'bond'); } });
+  return al;
+}
+function interlayer(g,al,zmid){
+  if(state.phase==='friedel'){
+    al.forEach(([x,y])=> addSphere(g,V(x,y,zmid),.66,colors.Cl,'X',null));
+  } else if(state.phase==='c4ah13'){
+    al.forEach(([x,y])=>{ const o=V(x-.8,y,zmid); addSphere(g,o,.40,colors.O,'X',null); const h=o.clone().add(new T.Vector3(.58,.25,0)); addSphere(g,h,.18,colors.H,'H',null); addCyl(g,o,h,.06,0xbec8d2,'bond'); const w=V(x+.95,y,zmid); addSphere(g,w,.45,colors.W,'H2O',null); const h1=w.clone().add(new T.Vector3(.72,.35,0)), h2=w.clone().add(new T.Vector3(-.24,.35,.66)); addSphere(g,h1,.18,colors.H,'H',null); addSphere(g,h2,.18,colors.H,'H',null); addCyl(g,w,h1,.06,0xbec8d2,'bond'); addCyl(g,w,h2,.06,0xbec8d2,'bond'); });
+  } else {
+    al.forEach(([x,y],idx)=>{ if(idx%2===0){ const s=V(x,y,zmid); addSphere(g,s,.60,colors.S,'X',null); const offs=[[1.05,.75,0],[-.35,-.75,.98],[-.35,-.75,-.98],[-.95,.75,0]]; offs.forEach(q=>{ const o=V(x+q[0],y+q[2],zmid+q[1]); addSphere(g,o,.36,colors.O,'O',null); addCyl(g,s,o,.07,colors.S,'bond'); }); } else { [[x-.8,y],[x+.8,y]].forEach(([xx,yy])=>{ const w=V(xx,yy,zmid); addSphere(g,w,.45,colors.W,'H2O',null); const h1=w.clone().add(new T.Vector3(.72,.35,0)), h2=w.clone().add(new T.Vector3(-.24,.35,.66)); addSphere(g,h1,.18,colors.H,'H',null); addSphere(g,h2,.18,colors.H,'H',null); addCyl(g,w,h1,.06,0xbec8d2,'bond'); addCyl(g,w,h2,.06,0xbec8d2,'bond'); }); } });
+  }
+}
+function addCell(g,origin){ const a=cfg.a; const v1=[1.5*a,-a*Math.sqrt(3)/2], v2=[1.5*a,a*Math.sqrt(3)/2]; const z=-2.1; const P=[[0,0],v1,[v1[0]+v2[0],v1[1]+v2[1]],v2].map(q=>V(origin[0]+q[0],origin[1]+q[1],z)); for(let i=0;i<4;i++) addCyl(g,P[i],P[(i+1)%4],.04,0xe8a23a,'cell'); addCyl(g,V(origin[0],origin[1],z),V(origin[0],origin[1],cfg.c),.035,0xe8a23a,'cell'); }
+function build(){ while(root.children.length)root.remove(root.children[0]); const g=new T.Group(); root.add(g); const al=principalLayer(g,0); principalLayer(g,cfg.c); interlayer(g,al,cfg.c/2); addCell(g,al.reduce((m,q)=>Math.hypot(q[0],q[1])<Math.hypot(m[0],m[1])?q:m)); root.position.y=-cfg.c/2; camera.position.set(0,9,48); camera.lookAt(0,0,0); document.getElementById('phaseTitle').textContent=phaseInfo[state.phase].title; document.getElementById('phaseText').innerHTML=phaseInfo[state.phase].text; applyButtons(); applyVisibility(); }
+const vis={Ca:true,Al:true,OH:true,H:true,H2O:true,X:true,bond:true,cell:true};
+function applyVisibility(){ root.traverse(o=>{ const sp=o.userData&&o.userData.sp; if(sp&&vis[sp]!==undefined) o.visible=vis[sp]; }); }
+function applyButtons(){ [...document.getElementById('phaseBtns').children].forEach(b=>b.classList.toggle('on',b.dataset.k===state.phase)); }
+[['monosulfate','Monossulfato'],['c4ah13','C₄AH₁₃'],['friedel','Sal de Friedel']].forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.k=k; b.onclick=()=>{state.phase=k; build();}; document.getElementById('phaseBtns').appendChild(b); });
+[['Perspectiva',.48,0],['Superior',1.57,0],['Lateral',0,0],['Inferior',-1.57,0]].forEach(([l,rx,ry])=>{ const b=document.createElement('button'); b.textContent=l; b.onclick=()=>{ state.auto=false; document.getElementById('bAuto').textContent='Girar automaticamente'; spin.rotation.set(rx,ry,0); }; document.getElementById('viewBtns').appendChild(b); });
+[['Ca','Ca'],['Al','Al'],['OH','O de OH'],['H','H'],['H2O','H₂O'],['X','Ânion X'],['bond','Ligações'],['cell','Cela']].forEach(([k,l])=>{ const lb=document.createElement('label'); lb.className='chk'; lb.innerHTML='<input type="checkbox" checked> '+l; lb.firstChild.onchange=e=>{vis[k]=e.target.checked; applyVisibility();}; document.getElementById('toggles').appendChild(lb); });
+function size(){ const w=host.clientWidth,h=host.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); } addEventListener('resize',size);
+size(); build();
+let drag=null; const cv=renderer.domElement; cv.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY]; state.auto=false; document.getElementById('bAuto').textContent='Girar automaticamente'; cv.setPointerCapture(e.pointerId);}); cv.addEventListener('pointermove',e=>{ if(!drag)return; spin.rotation.y+=(e.clientX-drag[0])*.01; spin.rotation.x=Math.max(-1.45,Math.min(1.45,spin.rotation.x+(e.clientY-drag[1])*.01)); drag=[e.clientX,e.clientY]; }); cv.addEventListener('pointerup',()=>drag=null);
+function zoom(f){ camera.position.multiplyScalar(f); const L=camera.position.length(); camera.position.multiplyScalar(Math.min(115,Math.max(12,L))/L); } cv.addEventListener('wheel',e=>{e.preventDefault(); zoom(e.deltaY>0?1.06:.94);},{passive:false});
+document.getElementById('bAuto').onclick=e=>{state.auto=!state.auto; e.target.textContent=state.auto?'Pausar rotação':'Girar automaticamente';}; document.getElementById('bReset').onclick=()=>{spin.rotation.set(.48,0,0); build();};
+const ray=new T.Raycaster(), mv=new T.Vector2(), tip=document.getElementById('tip'), nm={Ca:'Ca',Al:'Al',OH:'O de OH',O:'O do sulfato',H:'H',H2O:'O da H₂O',X:'Ânion X'};
+cv.addEventListener('pointermove',e=>{ if(drag){tip.style.display='none'; return;} const r=cv.getBoundingClientRect(); mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1); ray.setFromCamera(mv,camera); const hit=ray.intersectObjects(root.children,true).find(i=>i.object.isMesh && i.object.visible && i.object.userData.sp); if(!hit){tip.style.display='none'; return;} const u=hit.object.userData; let txt=nm[u.sp]||u.sp; if(typeof u.zr==='number') txt += ' · altura relativa = '+(u.zr/10).toFixed(3).replace('.',',')+' nm'; tip.textContent=txt; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px'; tip.style.display='block'; }); cv.addEventListener('pointerleave',()=>tip.style.display='none');
+(function loop(){ requestAnimationFrame(loop); if(state.auto) spin.rotation.y+=.004; renderer.render(scene,camera); })();
+</script>
+</body>
+</html>
