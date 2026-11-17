@@ -98,7 +98,7 @@ footer {color:var(--mut);font-size:12px;margin-top:18px;text-align:center}
 <main>
   <header>
     <h1>Fases AFm • Modelo 3D interativo</h1>
-    <p class="sub">Explore a estrutura em camadas. <strong>Arraste</strong> para girar; no celular, <strong>use dois dedos</strong> para aproximar ou afastar.</p>
+    <p class="sub">Explore a estrutura em camadas e isole os íons da intercamada. <strong>Arraste</strong> para girar; no celular, <strong>use dois dedos</strong> para aproximar ou afastar.</p>
   </header>
   <div class="grid">
     <section aria-label="Visualização tridimensional">
@@ -111,13 +111,13 @@ footer {color:var(--mut);font-size:12px;margin-top:18px;text-align:center}
         <span><i style="background:var(--al)"></i>Al</span>
         <span><i style="background:var(--o)"></i>O de OH</span>
         <span><i style="background:var(--w)"></i>O da H₂O</span>
-        <span><i style="background:var(--s)"></i>S / SO₄²⁻</span>
+        <span><i style="background:var(--s)"></i>S do SO₄²⁻</span>
         <span><i style="background:var(--cl)"></i>Cl⁻</span>
         <span><i style="background:#eef3f7;border:1px solid #9aa6b2"></i>H</span>
       </div>
       <div class="toolbar">
         <div class="toolbar-group">
-          <div class="toolbar-heading">Escolha a fase</div>
+          <div class="toolbar-heading">Escolha a fase (Cl⁻ somente no sal de Friedel)</div>
           <div class="phase-row" id="phaseBtns" role="group" aria-label="Selecionar fase AFm"></div>
         </div>
         <div class="toolbar-group">
@@ -132,6 +132,7 @@ footer {color:var(--mut);font-size:12px;margin-top:18px;text-align:center}
           <button id="bAuto" type="button">Pausar rotação</button>
           <button id="bReset" type="button">Reiniciar vista</button>
           <button id="bFull" type="button">Tela cheia</button>
+          <button id="bIsolate" type="button" aria-pressed="false">Isolar intercamada</button>
         </div>
       </div>
     </section>
@@ -144,7 +145,7 @@ footer {color:var(--mut);font-size:12px;margin-top:18px;text-align:center}
         <b>Elemento estrutural a</b><span>0,57–0,59 nm (aqui: 0,58 nm)</span>
         <b>Coordenação do Ca</b><span>6 OH + 1 H₂O interlamelar = 7</span>
       </div>
-      <small class="note">Modelo didático inspirado na Fig. 6.1 e na seção 6.1.1 de Taylor, <em>Cement Chemistry</em>. O empilhamento, parte das posições dos átomos e a geometria da água são aproximações, não coordenadas cristalográficas experimentais.</small>
+      <small class="note">Modelo didático inspirado na Fig. 6.1 de Taylor. O retículo metálico utiliza d = a/√3; cada OH interno conecta-se a três cátions e os cátions interiores têm seis OH ao redor. Nas bordas do recorte, a coordenação pode parecer incompleta. A geometria da água, o empilhamento e a distribuição de ânions são aproximados, não coordenadas cristalográficas experimentais. O Cl⁻ aparece apenas na opção Sal de Friedel.</small>
     </aside>
   </div>
   <footer>Conteúdo para fins acadêmicos • AFm: aluminato/ferrita monossubstituídos</footer>
@@ -168,46 +169,149 @@ const camera=new T.PerspectiveCamera(38,1,0.1,500);
 scene.add(new T.AmbientLight(0xffffff,.62)); const d1=new T.DirectionalLight(0xffffff,.95); d1.position.set(20,25,18); scene.add(d1); const d2=new T.DirectionalLight(0xffffff,.35); d2.position.set(-15,-10,6); scene.add(d2);
 const spin=new T.Group(), root=new T.Group(); spin.add(root); scene.add(spin); spin.rotation.x=.48;
 const V=(x,y,z)=>new T.Vector3(x,z,-y); // keep z as vertical in scene
-const cfg={a:5.8,c:7.9,ca:0.57,oh:0.98,w:2.35,n:4};
+const cfg={a:5.8,d:5.8/Math.sqrt(3),c:7.9,ca:0.57,oh:0.98,w:2.35,n:5};
 const colors={Ca:0x4caf6a,Al:0xb35fa8,O:0xe5534b,H:0xeef3f7,W:0x4a9de0,S:0xe8c53a,Cl:0x9acd32,bond:0x8994a1};
-const state={phase:'monosulfate',auto:!matchMedia("(prefers-reduced-motion: reduce)").matches};
+const state={phase:'monosulfate',auto:!matchMedia("(prefers-reduced-motion: reduce)").matches,isolate:false};
 const phaseInfo={
   monosulfate:{title:'AFm tipo monossulfato (C₃A·CaSO₄·12H₂O)',text:'<p>Nesta representação completa, a intercamada mostra um padrão simplificado do <b>monossulfato</b>: parte das cavidades contém <b>SO₄²⁻</b> (aqui mostrado como tetraedro) e as demais contêm <b>duas moléculas de H₂O</b>.</p><p>Essa é a fase AFm mais importante para a hidratação do cimento Portland quando o sulfato disponível diminui.</p>'},
   c4ah13:{title:'AFm tipo C₄AH₁₃',text:'<p>No <b>C₄AH₁₃</b>, as cavidades interlamelares contêm <b>um OH⁻ e uma H₂O</b>. A fase é útil para compreender o papel das intercamadas e da troca aniônica nas AFm.</p>'},
   friedel:{title:'AFm tipo sal de Friedel (C₃A·CaCl₂·10H₂O)',text:'<p>No <b>sal de Friedel</b>, cada cavidade da intercamada contém um <b>Cl⁻</b>. Essa fase é relevante em sistemas cimentícios expostos a cloretos.</p>'}
 };
-const sphereGeometry = new T.SphereGeometry(1, 14, 10);
-const cylinderGeometry = new T.CylinderGeometry(1,1,1,8);
+const sphereGeometry = new T.SphereGeometry(1, 16, 12);
+const cylinderGeometry = new T.CylinderGeometry(1,1,1,10);
 const materials = new Map();
 function getMat(color){if(!materials.has(color)) materials.set(color,new T.MeshPhongMaterial({color:color,shininess:65})); return materials.get(color);}
-function addSphere(g,pos,r,col,sp,zr){const m=new T.Mesh(sphereGeometry,getMat(col));m.scale.setScalar(r);m.position.copy(pos);m.userData={sp,zr};g.add(m);return m;}
+function addSphere(g,pos,r,col,sp,zr,atomName){const m=new T.Mesh(sphereGeometry,getMat(col));m.scale.setScalar(r);m.position.copy(pos);m.userData={sp,zr,atomName};g.add(m);return m;}
 function addCyl(g,p1,p2,r,col,sp){const v=new T.Vector3().subVectors(p2,p1);const h=v.length();if(h<1e-6)return;const m=new T.Mesh(cylinderGeometry,getMat(col));m.scale.set(r,h,r);m.position.copy(new T.Vector3().addVectors(p1,p2).multiplyScalar(.5));m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v.normalize());m.userData={sp};g.add(m);return m;}
 function unique(points){const m=new Map(); points.forEach(p=>{const k=[p.x.toFixed(3),p.y.toFixed(3),p.z.toFixed(3)].join('|'); m.set(k,p);}); return [...m.values()];}
 function principalLayer(g,z0){
-  const a=cfg.a,N=cfg.n,cx=(N-1)*a*.75,cy=(N-1)*a*Math.sqrt(3)/4; const al=[]; const metals=[]; let ohs=[];
+  // Rede triangular de sítios metálicos: distância entre vizinhos d = a/√3.
+  // OH nos baricentros dos triângulos: cada OH pertence a 3 cátions;
+  // cátions interiores coordenam 6 oxigênios de OH. Átomos periféricos
+  // fazem parte de um recorte e podem apresentar coordenação incompleta.
+  const d=cfg.d,N=cfg.n;
+  const u=[d,0],v=[d/2,d*Math.sqrt(3)/2];
+  const cx=(N-1)*(u[0]+v[0])/2,cy=(N-1)*v[1]/2;
+  const pxy=(i,j)=>[i*u[0]+j*v[0]-cx, i*u[1]+j*v[1]-cy];
+  const sites=new Map(), al=[];
   for(let i=0;i<N;i++)for(let j=0;j<N;j++){
-    const x=i*a+j*a/2-cx, y=j*a*Math.sqrt(3)/2-cy; const k=((i-j)%3+3)%3, isAl=k===0, up=k===1;
-    const z=z0+(isAl?0:(up?cfg.ca:-cfg.ca)); const p=V(x,y,z); const sp=isAl?'Al':'Ca'; addSphere(g,p,isAl?.55:.72,colors[sp],sp,z-z0); metals.push({sp,p,up,isAl,x,y}); if(isAl)al.push([x,y]);
-    ohs.push(V(x+a/2,y+a*Math.sqrt(3)/6,z0+cfg.oh), V(x+a,y+a*Math.sqrt(3)/3,z0-cfg.oh));
+    const [x,y]=pxy(i,j), k=((i-j)%3+3)%3;
+    const isAl=(k===0),up=(k===1);
+    const height=z0+(isAl?0:(up?cfg.ca:-cfg.ca));
+    const m=V(x,y,height),sp=isAl?'Al':'Ca';
+    addSphere(g,m,isAl?.50:.65,colors[sp],sp,height-z0,sp==='Al'?'Al³⁺':'Ca²⁺');
+    sites.set(`${i},${j}`,{p:m,sp,up,x,y});
+    if(isAl)al.push([x,y]);
   }
-  ohs=unique(ohs);
-  ohs.forEach(o=>{ addSphere(g,o,.42,colors.O,'OH',o.y-z0); const h=new T.Vector3(o.x,o.y+(o.y>=z0?.8:-.8),o.z); addSphere(g,h,.18,colors.H,'H',h.y-z0); addCyl(g,o,h,.06,0xbec8d2,'bond'); });
-  metals.forEach(m=>{ ohs.forEach(o=>{ if(m.p.distanceTo(o)<4.15) addCyl(g,m.p,o,.085,colors.bond,'bond'); }); if(m.sp==='Ca'){ const wz=z0+(m.up?cfg.ca+cfg.w:-(cfg.ca+cfg.w)); const w=V(m.x,m.y,wz); addSphere(g,w,.45,colors.W,'H2O',w.y-z0); addCyl(g,m.p,w,.09,0x6d7e8e,'bond'); const h1=w.clone().add(new T.Vector3(.72,.35,0)); const h2=w.clone().add(new T.Vector3(-.24,.35,.66)); addSphere(g,h1,.18,colors.H,'H',h1.y-z0); addSphere(g,h2,.18,colors.H,'H',h2.y-z0); addCyl(g,w,h1,.06,0xbec8d2,'bond'); addCyl(g,w,h2,.06,0xbec8d2,'bond'); } });
+  for(let i=0;i<N-1;i++)for(let j=0;j<N-1;j++){
+    // Faces triangulares alternadas: cada triângulo tem três cátions.
+    for(const tri of [
+      [[i,j],[i+1,j],[i,j+1]],
+      [[i+1,j],[i,j+1],[i+1,j+1]]
+    ]){
+      const cations=tri.map(([ii,jj])=>sites.get(`${ii},${jj}`));
+      // A orientação alternada acima/abaixo é atribuída ao tipo de triângulo.
+      const upper=(tri[0][0]===i && tri[0][1]===j);
+      const oz=z0+(upper?cfg.oh:-cfg.oh);
+      const ox=cations.reduce((sum,t)=>sum+t.x,0)/3;
+      const oy=cations.reduce((sum,t)=>sum+t.y,0)/3;
+      const o=V(ox,oy,oz);
+      addSphere(g,o,.35,colors.O,'OH',oz-z0,'O do grupo OH⁻');
+      const h=o.clone().add(new T.Vector3(0,upper?.78:-.78,0));
+      addSphere(g,h,.17,colors.H,'H',h.y-z0,'H do grupo OH⁻');
+      addCyl(g,o,h,.055,0xbec8d2,'bond');
+      cations.forEach(cat=>addCyl(g,cat.p,o,.072,colors.bond,'bond'));
+    }
+  }
+  // Sétimo ligante do Ca: água coordenada no lado de deslocamento de cada Ca.
+  for(const metal of sites.values()){
+    if(metal.sp!=='Ca')continue;
+    const height=z0+(metal.up?(cfg.ca+cfg.w):-(cfg.ca+cfg.w));
+    const w=V(metal.x,metal.y,height);
+    addSphere(g,w,.43,colors.W,'H2O',height-z0,'O da H₂O coordenada ao Ca');
+    addCyl(g,metal.p,w,.085,0x6d7e8e,'bond');
+    const sign=metal.up?1:-1;
+    const h1=w.clone().add(new T.Vector3(.72,.38*sign,0));
+    const h2=w.clone().add(new T.Vector3(-.24,.38*sign,.66));
+    addSphere(g,h1,.17,colors.H,'H',h1.y-z0,'H da H₂O');
+    addSphere(g,h2,.17,colors.H,'H',h2.y-z0,'H da H₂O');
+    addCyl(g,w,h1,.055,0xbec8d2,'bond');
+    addCyl(g,w,h2,.055,0xbec8d2,'bond');
+  }
   return al;
 }
 function interlayer(g,al,zmid){
+  const addWater=(x,y,z)=>{
+    const w=V(x,y,z);
+    addSphere(g,w,.40,colors.W,'H2O',null,'O da H₂O interlamelar');
+    const h1=w.clone().add(new T.Vector3(.71,.35,0));
+    const h2=w.clone().add(new T.Vector3(-.23,.35,.66));
+    addSphere(g,h1,.17,colors.H,'H',null,'H da H₂O');
+    addSphere(g,h2,.17,colors.H,'H',null,'H da H₂O');
+    addCyl(g,w,h1,.055,0xbec8d2,'bond');
+    addCyl(g,w,h2,.055,0xbec8d2,'bond');
+  };
   if(state.phase==='friedel'){
-    al.forEach(([x,y])=> addSphere(g,V(x,y,zmid),.66,colors.Cl,'X',null));
+    // Cl⁻ é um íon livre na cavidade, sem ligação covalente Cl–O da camada.
+    al.forEach(([x,y])=>addSphere(g,V(x,y,zmid),.62,colors.Cl,'X',null,'Cl⁻ (ânion interlamelar)'));
   } else if(state.phase==='c4ah13'){
-    al.forEach(([x,y])=>{ const o=V(x-.8,y,zmid); addSphere(g,o,.40,colors.O,'X',null); const h=o.clone().add(new T.Vector3(.58,.25,0)); addSphere(g,h,.18,colors.H,'H',null); addCyl(g,o,h,.06,0xbec8d2,'bond'); const w=V(x+.95,y,zmid); addSphere(g,w,.45,colors.W,'H2O',null); const h1=w.clone().add(new T.Vector3(.72,.35,0)), h2=w.clone().add(new T.Vector3(-.24,.35,.66)); addSphere(g,h1,.18,colors.H,'H',null); addSphere(g,h2,.18,colors.H,'H',null); addCyl(g,w,h1,.06,0xbec8d2,'bond'); addCyl(g,w,h2,.06,0xbec8d2,'bond'); });
+    al.forEach(([x,y])=>{
+      const o=V(x-.67,y,zmid);
+      addSphere(g,o,.38,colors.O,'X',null,'O do OH⁻ interlamelar');
+      const h=o.clone().add(new T.Vector3(.65,.20,0));
+      addSphere(g,h,.17,colors.H,'X',null,'H do OH⁻ interlamelar');
+      addCyl(g,o,h,.055,0xbec8d2,'anionBond');
+      addWater(x+.85,y,zmid);
+    });
   } else {
-    al.forEach(([x,y],idx)=>{ if(idx%2===0){ const s=V(x,y,zmid); addSphere(g,s,.60,colors.S,'X',null); const offs=[[1.05,.75,0],[-.35,-.75,.98],[-.35,-.75,-.98],[-.95,.75,0]]; offs.forEach(q=>{ const o=V(x+q[0],y+q[2],zmid+q[1]); addSphere(g,o,.36,colors.O,'O_SO4',null); addCyl(g,s,o,.07,colors.S,'bond'); }); } else { [[x-.8,y],[x+.8,y]].forEach(([xx,yy])=>{ const w=V(xx,yy,zmid); addSphere(g,w,.45,colors.W,'H2O',null); const h1=w.clone().add(new T.Vector3(.72,.35,0)), h2=w.clone().add(new T.Vector3(-.24,.35,.66)); addSphere(g,h1,.18,colors.H,'H',null); addSphere(g,h2,.18,colors.H,'H',null); addCyl(g,w,h1,.06,0xbec8d2,'bond'); addCyl(g,w,h2,.06,0xbec8d2,'bond'); }); } });
+    const tetra=[
+      [1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]
+    ];
+    al.forEach(([x,y],idx)=>{
+      if(idx%2===0){
+        const s=V(x,y,zmid);
+        addSphere(g,s,.51,colors.S,'X',null,'S (centro de SO₄²⁻)');
+        tetra.forEach(v=>{
+          const norm=1.47/Math.sqrt(3);
+          const o=V(x+v[0]*norm,y+v[1]*norm,zmid+v[2]*norm);
+          addSphere(g,o,.34,colors.O,'X',null,'O do ânion SO₄²⁻');
+          addCyl(g,s,o,.075,0xd5a62d,'anionBond');
+        });
+      } else {
+        addWater(x-.83,y,zmid);
+        addWater(x+.83,y,zmid);
+      }
+    });
   }
 }
 function addCell(g,origin){ const a=cfg.a; const v1=[1.5*a,-a*Math.sqrt(3)/2], v2=[1.5*a,a*Math.sqrt(3)/2]; const z=-2.1; const P=[[0,0],v1,[v1[0]+v2[0],v1[1]+v2[1]],v2].map(q=>V(origin[0]+q[0],origin[1]+q[1],z)); for(let i=0;i<4;i++) addCyl(g,P[i],P[(i+1)%4],.04,0xe8a23a,'cell'); addCyl(g,V(origin[0],origin[1],z),V(origin[0],origin[1],cfg.c),.035,0xe8a23a,'cell'); }
-function build(){ while(root.children.length)root.remove(root.children[0]); const g=new T.Group(); root.add(g); const al=principalLayer(g,0); principalLayer(g,cfg.c); interlayer(g,al,cfg.c/2); addCell(g,al.reduce((m,q)=>Math.hypot(q[0],q[1])<Math.hypot(m[0],m[1])?q:m)); root.position.y=-cfg.c/2; fitCamera(); document.getElementById('phaseTitle').textContent=phaseInfo[state.phase].title; document.getElementById('phaseText').innerHTML=phaseInfo[state.phase].text; applyButtons(); applyVisibility(); }
-const vis={Ca:true,Al:true,OH:true,H:true,H2O:true,X:true,O_SO4:true,bond:true,cell:true};
-function applyVisibility(){ root.traverse(o=>{ const sp=o.userData&&o.userData.sp; if(sp&&vis[sp]!==undefined) o.visible=(sp==='O_SO4'?vis.X:vis[sp]); }); }
+function build(){
+  while(root.children.length)root.remove(root.children[0]);
+  const bottom=new T.Group(),top=new T.Group(),middle=new T.Group();
+  bottom.userData.part='layer'; top.userData.part='layer'; middle.userData.part='interlayer';
+  root.add(bottom,top,middle);
+  const al=principalLayer(bottom,0);
+  principalLayer(top,cfg.c);
+  interlayer(middle,al,cfg.c/2);
+  addCell(bottom,al.reduce((m,q)=>Math.hypot(q[0],q[1])<Math.hypot(m[0],m[1])?q:m));
+  root.position.y=-cfg.c/2;
+  fitCamera();
+  document.getElementById('phaseTitle').textContent=phaseInfo[state.phase].title;
+  document.getElementById('phaseText').innerHTML=phaseInfo[state.phase].text;
+  applyButtons();applyVisibility();
+}
+const vis={Ca:true,Al:true,OH:true,H:true,H2O:true,X:true,bond:true,cell:true};
+function applyVisibility(){
+  root.children.forEach(part=>{
+    part.visible=!(state.isolate && part.userData.part==='layer');
+  });
+  root.traverse(o=>{
+    const sp=o.userData&&o.userData.sp;
+    if(!sp)return;
+    if(sp==='anionBond')o.visible=!!vis.X&&!!vis.bond;
+    else if(vis[sp]!==undefined)o.visible=!!vis[sp];
+  });
+}
 function applyButtons(){ [...document.getElementById('phaseBtns').children].forEach(b=>{b.classList.toggle('on',b.dataset.k===state.phase);b.setAttribute('aria-pressed',String(b.dataset.k===state.phase));}); }
 [['monosulfate','Monossulfato'],['c4ah13','C₄AH₁₃'],['friedel','Sal de Friedel']].forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.k=k; b.setAttribute('aria-pressed', String(state.phase===k)); b.onclick=()=>{state.phase=k; build();}; document.getElementById('phaseBtns').appendChild(b); });
 [['Perspectiva',.48,0],['Superior',1.57,0],['Lateral',0,0],['Inferior',-1.57,0]].forEach(([l,rx,ry])=>{ const b=document.createElement('button'); b.textContent=l; b.onclick=()=>{ state.auto=false; document.getElementById('bAuto').textContent='Girar automaticamente'; spin.rotation.set(rx,ry,0); }; document.getElementById('viewBtns').appendChild(b); });
@@ -286,6 +390,8 @@ host.addEventListener('keydown',e=>{
 document.getElementById('bAuto').onclick=e=>{state.auto=!state.auto;e.target.textContent=state.auto?'Pausar rotação':'Girar automaticamente';};
 document.getElementById('bAuto').textContent=state.auto?'Pausar rotação':'Girar automaticamente';
 document.getElementById('bReset').onclick=()=>{stopAuto();spin.rotation.set(.48,0,0);fitCamera();};
+const bIsolate=document.getElementById('bIsolate');
+bIsolate.onclick=()=>{state.isolate=!state.isolate;bIsolate.setAttribute('aria-pressed',String(state.isolate));bIsolate.textContent=state.isolate?'Mostrar camadas':'Isolar intercamada';applyVisibility();};
 const bFull=document.getElementById('bFull');
 bFull.onclick=async()=>{
   try{
@@ -295,7 +401,7 @@ bFull.onclick=async()=>{
   }catch(e){bFull.title='Tela cheia não está disponível neste navegador';}
 };
 document.addEventListener('fullscreenchange',()=>{bFull.textContent=document.fullscreenElement?'Sair da tela cheia':'Tela cheia';size();});
-const ray=new T.Raycaster(),mv=new T.Vector2(),tip=document.getElementById('tip'),nm={Ca:'Ca',Al:'Al',OH:'O de OH',O_SO4:'O do sulfato',H:'H',H2O:'O da H₂O',X:'Ânion X'};
+const ray=new T.Raycaster(),mv=new T.Vector2(),tip=document.getElementById('tip'),nm={Ca:'Ca²⁺',Al:'Al³⁺',OH:'O de OH',H:'H',H2O:'O da H₂O',X:'Ânion interlamelar'};
 cv.addEventListener('pointermove',e=>{
   if(active.size || e.pointerType!=='mouse'){tip.style.display='none';return;}
   const r=cv.getBoundingClientRect();mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);
@@ -303,7 +409,7 @@ cv.addEventListener('pointermove',e=>{
   const hit=ray.intersectObjects(root.children,true).find(i=>i.object.isMesh&&i.object.visible&&i.object.userData.sp);
   if(!hit){tip.style.display='none';return;}
   const u=hit.object.userData;
-  let txt=nm[u.sp]||u.sp;
+  let txt=u.atomName||nm[u.sp]||u.sp;
   if(typeof u.zr==='number')txt+=' · altura relativa = '+(u.zr/10).toFixed(3).replace('.',',')+' nm';
   tip.textContent=txt;tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px';tip.style.display='block';
 });
